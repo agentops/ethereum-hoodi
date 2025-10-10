@@ -37,13 +37,7 @@ variable "prometheus_image" {
   type        = string
   default     = "prom/prometheus"
 }
-/*
-variable "pushgateway_image" {
-  description = "The Docker image for Prometheus Pushgateway."
-  type        = string
-  default     = "prom/pushgateway:latest"
-}
-*/
+
 variable "consensus_data_dir" {
   description = "The data directory for the consensus client."
   type        = string

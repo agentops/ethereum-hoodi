@@ -56,13 +56,7 @@ resource "docker_image" "consensus_client" {
   keep_locally = false
 
 }
-/*
-resource "docker_image" "pushgateway" {
-  name         = var.pushgateway_image
-  keep_locally = false
 
-}
-*/
 resource "docker_image" "prometheus" {
   name         = var.prometheus_image
   keep_locally = false
@@ -173,18 +167,6 @@ resource "docker_container" "consensus_client" {
   ]
 }
 
-/* Promgateway Container
-resource "docker_container" "gateway" {
-  name  = "prometheus_pushgateway"
-  image = docker_image.pushgateway.name
-  ports {
-    internal = 9091
-    external = 9091
-    protocol = "tcp"
-  }
-  #command = ["/bin/pushgateway", "--web.listen-address", "0.0.0.0" ]
-}
-*/
 
 /* Prometheus Container*/
 resource "docker_container" "prometheus" {
