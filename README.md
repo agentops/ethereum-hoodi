@@ -33,4 +33,4 @@ Create a .tfvars file to update the variables or run with the default variables.
 
 if satisfied with outcome of the above command then:
 
-``` terraform apply --auto-approve``
+``` terraform apply --auto-approve```
