@@ -31,7 +31,7 @@ jobs:
               run: terraform plan -out=tfplan -input=false 
               
             - name: "Show plan"
-              run: terraform show -no-color tfplan
+              run: terraform show tfplan -json
               
           
 
