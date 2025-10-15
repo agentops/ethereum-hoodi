@@ -31,7 +31,7 @@ jobs:
               run: terraform plan -out=tfplan -input=false 
               
             - name: "Show plan"
-              run: terraform show -json tfplan
+              run: terraform show -json tfplan | jq
               
           
 
