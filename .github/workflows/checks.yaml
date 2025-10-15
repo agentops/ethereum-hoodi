@@ -14,10 +14,10 @@ on:
 
 
 jobs:
-    Terraform Init:
-        runs_on: ubuntu-latest
+    initialization:
+        runs-on: ubuntu-latest
         if: ${{ inputs.environment == 'dev' }}
         steps:
-            - name: Run Terraform init
+            - name: "Terraform init"
                 run: terraform init 
             
