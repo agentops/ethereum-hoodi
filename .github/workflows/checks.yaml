@@ -18,6 +18,9 @@ jobs:
         runs-on: ubuntu-latest
         if: ${{ inputs.environment == 'dev' }}
         steps:
+            - name: "Setup terraform"
+              uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1
+              
             - name: "Terraform init"
               run: terraform init 
             
