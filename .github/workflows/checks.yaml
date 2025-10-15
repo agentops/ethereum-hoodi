@@ -1,0 +1,23 @@
+name: Tests Terrafrorm code
+on: 
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: "Environment to deploy to"
+                required: true
+                default: dev
+                type: choice
+                options:
+                    - dev
+                    - staging
+                    - prod
+
+
+jobs:
+    Terraform Init:
+        runs_on: ubuntu-latest
+        if: ${{ inputs.environment == 'dev' }}
+        steps:
+            - name: Run Terraform init
+                run: terraform init 
+            
