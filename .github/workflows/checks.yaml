@@ -1,5 +1,9 @@
-name: Tests Terrafrorm code
+name: Infrastructure Pipeline
 on: 
+    push:
+        branches: [ main ]
+    pull_request:
+        branches: [ main ]
     workflow_dispatch:
         inputs:
             environment:
@@ -12,26 +16,128 @@ on:
                     - staging
                     - prod
 
+env:
+    TF_LOG: INFO
+    TERRAFORM_VERSION: "1.5.0"
 
 jobs:
-    initialization:
+    security-scan:
+        name: Security Scan
         runs-on: ubuntu-latest
-        if: ${{ inputs.environment == 'dev' || inputs.environment == 'staging' }}
         steps:
-            - name: "Setup terraform"
-              uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1
-            
-            - name: "Checkout code"
+            - name: Checkout code
               uses: actions/checkout@v3
-              
-            - name: "Terraform init"
-              run: terraform init 
-    
-            - name: "Terraform plan"
-              run: terraform plan -out=tfplan -input=false 
-              
-            - name: "Show plan"
-              run: terraform show -json tfplan 
+
+            - name: Run tfsec
+              uses: aquasecurity/tfsec-action@v1.0.0
+              with:
+                soft_fail: true
+
+            - name: Run checkov
+              uses: bridgecrewio/checkov-action@master
+              with:
+                directory: .
+                framework: terraform
+                soft_fail: true
+
+    terraform-plan:
+        needs: security-scan
+        runs-on: ubuntu-latest
+        outputs:
+            tfplan: ${{ steps.plan.outputs.plan }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v2
+              with:
+                terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+            - name: Terraform Format Check
+              run: terraform fmt -check -recursive
+              continue-on-error: true
+
+            - name: Terraform Init
+              run: |
+                terraform init \
+                  -backend-config="key=${{ github.event.inputs.environment }}/terraform.tfstate"
+
+            - name: Terraform Validate
+              run: terraform validate
+
+            - name: Terraform Plan
+              id: plan
+              run: |
+                terraform plan -out=tfplan -input=false -var-file="environments/${{ github.event.inputs.environment }}.tfvars"
+                terraform show -json tfplan > plan.json
+                
+            - name: Upload Plan Artifact
+              uses: actions/upload-artifact@v3
+              with:
+                name: tfplan
+                path: |
+                  tfplan
+                  plan.json
+
+    plan-analysis:
+        needs: terraform-plan
+        runs-on: ubuntu-latest
+        steps:
+            - name: Download Plan
+              uses: actions/download-artifact@v3
+              with:
+                name: tfplan
+
+            - name: Install infracost
+              run: curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+
+            - name: Analyze Cost Changes
+              run: |
+                infracost breakdown --path plan.json \
+                  --format json \
+                  --out-file cost.json
+
+            - name: Check Resource Changes
+              run: |
+                DELETES=$(jq '.resource_changes[] | select(.change.actions[] | contains("delete"))' plan.json | jq -s 'length')
+                if [ $DELETES -gt 0 ]; then
+                  echo "⚠️ Warning: Plan includes resource deletions!"
+                  exit 1
+                fi
+
+    deploy:
+        needs: [plan-analysis]
+        runs-on: ubuntu-latest
+        environment:
+          name: ${{ github.event.inputs.environment }}
+          url: ${{ steps.deploy_url.outputs.url }}
+        if: |
+          github.event_name == 'workflow_dispatch' &&
+          (github.event.inputs.environment == 'dev' ||
+           (github.event.inputs.environment == 'staging' && github.ref == 'refs/heads/main') ||
+           (github.event.inputs.environment == 'prod' && github.ref == 'refs/heads/main'))
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v2
+              with:
+                terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+            - name: Download Plan
+              uses: actions/download-artifact@v3
+              with:
+                name: tfplan
+
+            - name: Terraform Apply
+              run: terraform apply -auto-approve tfplan
+
+            - name: Set Deploy URL
+              id: deploy_url
+              run: |
+                echo "url=https://grafana-${{ github.event.inputs.environment }}.example.com" >> $GITHUB_OUTPUT
               
           
 
