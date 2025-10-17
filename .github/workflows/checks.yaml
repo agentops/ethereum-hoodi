@@ -19,6 +19,7 @@ on:
 env:
     TF_LOG: INFO
     TERRAFORM_VERSION: "1.5.0"
+    DEFAULT_ENVIRONMENT: "dev"
 
 jobs:
     security-scan:
@@ -45,6 +46,8 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             tfplan: ${{ steps.plan.outputs.plan }}
+        env:
+            ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
         steps:
             - name: Checkout code
               uses: actions/checkout@v3
@@ -61,7 +64,7 @@ jobs:
             - name: Terraform Init
               run: |
                 terraform init \
-                  -backend-config="key=${{ github.event.inputs.environment }}/terraform.tfstate"
+                  -backend-config="key=${{ env.ENVIRONMENT }}/terraform.tfstate"
 
             - name: Terraform Validate
               run: terraform validate
@@ -69,7 +72,7 @@ jobs:
             - name: Terraform Plan
               id: plan
               run: |
-                terraform plan -out=tfplan -input=false -var-file="environments/${{ github.event.inputs.environment }}.tfvars"
+                terraform plan -out=tfplan -input=false -var-file="environments/${{ env.ENVIRONMENT }}.tfvars"
                 terraform show -json tfplan > plan.json
                 
             - name: Upload Plan Artifact
@@ -113,7 +116,7 @@ jobs:
           name: ${{ github.event.inputs.environment }}
           url: ${{ steps.deploy_url.outputs.url }}
         if: |
-          github.event_name == 'workflow_dispatch' &&
+          github.event_name == 'workflow_dispatch' && 
           (github.event.inputs.environment == 'dev' ||
            (github.event.inputs.environment == 'staging' && github.ref == 'refs/heads/main') ||
            (github.event.inputs.environment == 'prod' && github.ref == 'refs/heads/main'))
